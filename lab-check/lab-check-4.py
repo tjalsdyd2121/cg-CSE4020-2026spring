@@ -91,31 +91,7 @@ def key_callback(window, key, scancode, action, mods):
     if key==GLFW_KEY_ESCAPE and action==GLFW_PRESS:
         glfwSetWindowShouldClose(window, GLFW_TRUE);
 
-def main():
-    # initialize glfw
-    if not glfwInit():
-        return
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)   # OpenGL 3.3
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3)
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE)  # Do not allow legacy OpenGl API calls
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE) # for macOS
-
-    # create a window and OpenGL context
-    window = glfwCreateWindow(800, 800, '4-animating-transform', None, None)
-    if not window:
-        glfwTerminate()
-        return
-    glfwMakeContextCurrent(window)
-
-    # register event callbacks
-    glfwSetKeyCallback(window, key_callback);
-
-    # load shaders
-    shader_program = load_shaders(g_vertex_shader_src, g_fragment_shader_src)
-
-    # get uniform locations
-    loc_M = glGetUniformLocation(shader_program, 'M')
-    
+def prepare_vao_triangle():
     # prepare vertex data (in main memory)
     vertices = glm.array(glm.float32,
         # position        # color
@@ -143,6 +119,71 @@ def main():
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), ctypes.c_void_p(3*glm.sizeof(glm.float32)))
     glEnableVertexAttribArray(1)
 
+    return VAO
+
+def prepare_vao_frame():
+    # prepare vertex data (in main memory)
+    vertices = glm.array(glm.float32,
+        # position        # color
+         0.0, 0.0, 0.0,  1.0, 0.0, 0.0, # x-axis start
+         1.0, 0.0, 0.0,  1.0, 0.0, 0.0, # x-axis end 
+         0.0, 0.0, 0.0,  0.0, 1.0, 0.0, # y-axis start
+         0.0, 1.0, 0.0,  0.0, 1.0, 0.0, # y-axis end 
+         0.0, 0.0, 0.0,  0.0, 0.0, 1.0, # z-axis start
+         0.0, 0.0, 1.0,  0.0, 0.0, 1.0, # z-axis end 
+    )
+
+    # create and activate VAO (vertex array object)
+    VAO = glGenVertexArrays(1)  # create a vertex array object ID and store it to VAO variable
+    glBindVertexArray(VAO)      # activate VAO
+
+    # create and activate VBO (vertex buffer object)
+    VBO = glGenBuffers(1)   # create a buffer object ID and store it to VBO variable
+    glBindBuffer(GL_ARRAY_BUFFER, VBO)  # activate VBO as a vertex buffer object
+
+    # copy vertex data to VBO
+    glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices.ptr, GL_STATIC_DRAW) # allocate GPU memory for and copy vertex data to the currently bound vertex buffer
+
+    # configure vertex positions
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), None)
+    glEnableVertexAttribArray(0)
+
+    # configure vertex colors
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), ctypes.c_void_p(3*glm.sizeof(glm.float32)))
+    glEnableVertexAttribArray(1)
+
+    return VAO
+
+
+def main():
+    # initialize glfw
+    if not glfwInit():
+        return
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)   # OpenGL 3.3
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3)
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE)  # Do not allow legacy OpenGl API calls
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE) # for macOS
+
+    # create a window and OpenGL context
+    window = glfwCreateWindow(800, 800, '5-drawing-frames', None, None)
+    if not window:
+        glfwTerminate()
+        return
+    glfwMakeContextCurrent(window)
+
+    # register event callbacks
+    glfwSetKeyCallback(window, key_callback);
+
+    # load shaders
+    shader_program = load_shaders(g_vertex_shader_src, g_fragment_shader_src)
+
+    # get uniform locations
+    loc_M = glGetUniformLocation(shader_program, 'M')
+    
+    # prepare vaos
+    vao_triangle = prepare_vao_triangle()
+    vao_frame = prepare_vao_frame()
+
     # loop until the user closes the window
     while not glfwWindowShouldClose(window):
         # render
@@ -150,36 +191,62 @@ def main():
 
         glUseProgram(shader_program)
 
+        # current frame: I (world frame)
+        I = np.identity(3)
+        glUniformMatrix3fv(loc_M, 1, GL_TRUE, I)
+        glBindVertexArray(vao_frame)
+        glDrawArrays(GL_LINES, 0, 6)
+
 
         # animating
         t = glfwGetTime()
 
         # rotation 30 deg
-        speed = 30
-        th = np.radians(t*speed)
+        th = np.radians(t*90)
         R = np.array([[np.cos(th), -np.sin(th), 0.],
                       [np.sin(th),  np.cos(th), 0.],
                       [0.,         0.,          1.]])
 
-        # tranlation by (.5, .2)
-        T = np.array([[1., 0., np.sin(t)],
-                      [0., 1., np.cos(t)],
+        # tranlation 
+        T = np.array([[0.5, 0., 0.5 * np.sin(t)],
+                      [0., 0.5, 0.5 * np.cos(t)],
                       [0., 0., 1.]])
 
-        M = R
-        M = T
-        # M = R @ T   # '@' is matrix-matrix / matrix-vector multiplication operator
-        # M = T @ R
-
-        # print(M)
-            
-        # note that 'transpose' (3rd parameter) is set to GL_TRUE
-        # because numpy array is row-major.
+        
+        M = R @ T
         glUniformMatrix3fv(loc_M, 1, GL_TRUE, M)
 
+        # draw current frame
+        glBindVertexArray(vao_frame)
+        glDrawArrays(GL_LINES, 0, 6)
 
-        glBindVertexArray(VAO)
+        glBindVertexArray(vao_triangle)
         glDrawArrays(GL_TRIANGLES, 0, 3)
+        
+        # M = T
+        # M = R @ T   # '@' is matrix-matrix / matrix-vector multiplication operator
+
+        # print(M)
+
+            
+        # current frame: M
+        T = np.array([[0.5, 0., 0.5 * np.cos(t)],
+                      [0., 0.5, 0.5 * np.sin(t)],
+                      [0., 0., 1.]])
+        M = M @ R @ T
+
+        glUniformMatrix3fv(loc_M, 1, GL_TRUE, M)
+
+        # draw triangle w.r.t. the current frame
+        glBindVertexArray(vao_triangle)
+        glDrawArrays(GL_TRIANGLES, 0, 3)
+
+        # M = T
+        # glUniformMatrix3fv(loc_M, 1, GL_TRUE, M)
+
+        # draw current frame
+        glBindVertexArray(vao_frame)
+        glDrawArrays(GL_LINES, 0, 6)
 
         # swap front and back buffers
         glfwSwapBuffers(window)
