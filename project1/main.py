@@ -174,7 +174,7 @@ def main():
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE) # for macOS
 
     # create a window and OpenGL context
-    window = glfwCreateWindow(800, 800, '3-lookat', None, None)
+    window = glfwCreateWindow(1000, 1000, 'project1-2022056562', None, None)
     if not window:
         glfwTerminate()
         return
@@ -203,13 +203,13 @@ def main():
 
         glUseProgram(shader_program)
 
-        # projection matrix
-        # use orthogonal projection (we'll see details later)
-        P = glm.ortho(-1,1,-1,1,-1,1)
+        # projection matrix        
+        #P = glm.ortho(-1,1,-1,1,-1,1)
+        P = glm.perspective(45,1,1,10)
 
         # view matrix
         # rotate camera position with g_cam_ang / move camera up & down with g_cam_height
-        V = glm.lookAt(glm.vec3(.1*np.sin(g_cam_ang),g_cam_height,.1*np.cos(g_cam_ang)), glm.vec3(0,0,0), glm.vec3(0,1,0))
+        V = glm.lookAt(glm.vec3(5*np.sin(g_cam_ang),g_cam_height,5*np.cos(g_cam_ang)), glm.vec3(0,0,0), glm.vec3(0,1,0))
 
         # current frame: P*V*I (now this is the world frame)
         I = glm.mat4()
