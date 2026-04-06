@@ -200,7 +200,7 @@ def main():
 
         # rotation
         th = np.radians(t*90)
-        R = glm.rotate(th, glm.vec3(0,0,1))
+        R = glm.rotate(90, glm.vec3(0,1,0))
 
         # tranlation
         T = glm.translate(glm.vec3(np.sin(t), .2, 0.))
