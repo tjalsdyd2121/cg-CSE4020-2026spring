@@ -206,13 +206,10 @@ def main():
         # projection matrix
         # use orthogonal projection (we'll see details later)
         P = glm.ortho(-1,1,-1,1,-1,1)
-        #P = glm.mat4()
+
         # view matrix
         # rotate camera position with g_cam_ang / move camera up & down with g_cam_height
-        # lookAr(eye,center,up)
-        # note that these are "vector"
-        V = glm.lookAt(glm.vec3(.1*np.sin(g_cam_ang),g_cam_height,.1*np.cos(g_cam_ang)), glm.vec3(0,0,0), glm.vec3(1,0,0))
-        #V = glm.lookAt(glm.vec3(0,0,0), glm.vec3(0,0,-1), glm.vec3(0,1,0))
+        V = glm.lookAt(glm.vec3(.1*np.sin(g_cam_ang),g_cam_height,.1*np.cos(g_cam_ang)), glm.vec3(0,0,0), glm.vec3(0,1,0))
 
         # current frame: P*V*I (now this is the world frame)
         I = glm.mat4()
