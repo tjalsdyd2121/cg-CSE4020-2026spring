@@ -100,6 +100,52 @@ def key_callback(window, key, scancode, action, mods):
             elif key==GLFW_KEY_W:
                 g_cam_height += -.1
 
+
+def prepare_vao_oct():
+    oct = []
+    k = 1.0
+    c = 0.1
+    middles = [
+        ([ k, k,  k], [ k, k, -k]),
+        ([ k, k,  k], [-k, k,  k]),
+        ([-k, k, -k], [-k, k,  k]),
+        ([ k, k, -k], [-k, k, -k])
+    ]
+    top_bot = [[0.0, 0.0, 0.0],[0.0, 2 * k, 0.0]]
+    for q in top_bot:
+        for w,e in middles:
+            oct.extend(q + [c,c,c])
+            oct.extend(w + [c,c,c])
+            oct.extend(e + [c,c,c])
+            c += 0.1
+    vertices = glm.array(glm.float32, *oct)
+    # create and activate VAO (vertex array object)
+    VAO = glGenVertexArrays(1)  # create a vertex array object ID and store it to VAO variable
+    glBindVertexArray(VAO)      # activate VAO
+
+    # create and activate VBO (vertex buffer object)
+    VBO = glGenBuffers(1)   # create a buffer object ID and store it to VBO variable
+    glBindBuffer(GL_ARRAY_BUFFER, VBO)  # activate VBO as a vertex buffer object
+
+    # copy vertex data to VBO
+    glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices.ptr, GL_STATIC_DRAW) # allocate GPU memory for and copy vertex data to the currently bound vertex buffer
+
+    # configure vertex positions
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), None)
+    glEnableVertexAttribArray(0)
+
+    # configure vertex colors
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), ctypes.c_void_p(3*glm.sizeof(glm.float32)))
+    glEnableVertexAttribArray(1)
+    return VAO
+
+def draw_oct(vao,MVP, loc_MVP):
+    glBindVertexArray(vao)
+    glUniformMatrix4fv(loc_MVP, 1, GL_FALSE, glm.value_ptr(MVP))
+    # 
+    glDrawArrays(GL_TRIANGLES, 0, 24)
+
+
 def prepare_vao_triangle():
     # prepare vertex data (in main memory)
     vertices = glm.array(glm.float32,
@@ -202,7 +248,7 @@ def prepare_vao_grid():
     # configure vertex colors
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), ctypes.c_void_p(3*glm.sizeof(glm.float32)))
     glEnableVertexAttribArray(1)
-    num = len(vertices)
+    num = len(vertices) // 6
     return VAO, num
 
 def draw_gird(vao, num, MVP, loc_MVP):
@@ -242,6 +288,7 @@ def main():
     vao_triangle = prepare_vao_triangle()
     vao_frame = prepare_vao_frame()
     vao_grid, num_grid_vertices = prepare_vao_grid()
+    vao_oct = prepare_vao_oct()
 
     # loop until the user closes the window
     while not glfwWindowShouldClose(window):
@@ -278,7 +325,7 @@ def main():
 
         # rotation
         th = np.radians(t*90)
-        R = glm.rotate(th, glm.vec3(0,0,1))
+        R = glm.rotate(th, glm.vec3(0,1,0))
 
         # tranlation
         T = glm.translate(glm.vec3(np.sin(t), .2, 0.))
@@ -297,8 +344,7 @@ def main():
         glUniformMatrix4fv(loc_MVP, 1, GL_FALSE, glm.value_ptr(MVP))
 
         # draw triangle w.r.t. the current frame
-        glBindVertexArray(vao_triangle)
-        glDrawArrays(GL_TRIANGLES, 0, 3)
+        draw_oct(vao_oct, MVP,loc_MVP)
 
         # draw current frame
         glBindVertexArray(vao_frame)
