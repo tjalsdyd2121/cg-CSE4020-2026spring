@@ -4,8 +4,21 @@ import glm
 import ctypes
 import numpy as np
 
-g_cam_ang = 0.
-g_cam_height = .1
+# Orbit -> 구면좌표계 사용 
+# eye point 위치와 up vector 표현가능
+g_cam_r = 5.0
+g_cam_theta = np.radians(45)
+g_cam_phi = np.radians(45)
+
+# centor point 위치
+g_cam_center = glm.vec3(0.0,0.0,0.0)
+# 마우스
+g_mouse_is_dragged = False
+g_mouse_x_pos = 0.0
+g_mouse_y_pos = 0.0
+# 키보드 입력
+g_z_is_pressed = False
+g_x_is_pressed = False
 
 g_vertex_shader_src = '''
 #version 330 core
@@ -84,21 +97,62 @@ def load_shaders(vertex_shader_source, fragment_shader_source):
 
     return shader_program    # return the shader program
 
+def button_callback(window, button, action, mod):
+    global g_mouse_is_dragged, g_mouse_x_pos, g_mouse_y_pos
+    if button==GLFW_MOUSE_BUTTON_LEFT:
+        if action==GLFW_PRESS:
+            g_mouse_is_dragged = True
+            g_mouse_x_pos, g_mouse_y_pos = glfwGetCursorPos(window)
+        elif action==GLFW_RELEASE:
+            g_mouse_is_dragged = False
 
 def key_callback(window, key, scancode, action, mods):
-    global g_cam_ang, g_cam_height
-    if key==GLFW_KEY_ESCAPE and action==GLFW_PRESS:
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
-    else:
-        if action==GLFW_PRESS or action==GLFW_REPEAT:
-            if key==GLFW_KEY_1:
-                g_cam_ang += np.radians(-10)
-            elif key==GLFW_KEY_3:
-                g_cam_ang += np.radians(10)
-            elif key==GLFW_KEY_2:
-                g_cam_height += .1
-            elif key==GLFW_KEY_W:
-                g_cam_height += -.1
+    global g_x_is_pressed, g_z_is_pressed
+    if key == GLFW_KEY_X:
+        if action == GLFW_PRESS or action == GLFW_REPEAT:
+            g_x_is_pressed = True
+        elif action == GLFW_RELEASE:
+            g_x_is_pressed = False
+            
+    elif key == GLFW_KEY_Z:
+        if action == GLFW_PRESS or action == GLFW_REPEAT:
+            g_z_is_pressed = True
+        elif action == GLFW_RELEASE:
+            g_z_is_pressed = False
+
+def cursor_callback(window, xpos, ypos):
+    global g_cam_r, g_cam_theta, g_cam_phi, g_cam_center, g_mouse_is_dragged, g_mouse_x_pos, g_mouse_y_pos,g_x_is_pressed, g_z_is_pressed
+
+    if g_mouse_is_dragged:
+        # xpos는 parameter로 실시간 들어오는 현재 위치
+        dx = xpos - g_mouse_x_pos
+        dy = ypos - g_mouse_y_pos
+        # glfwGetCursorPos(window)
+        if g_x_is_pressed:
+            # Pan action
+            # xz 축만 이동, 현재 바라보고있는 방향에 대해서 -> theta 필요
+            pan_sens = 0.01
+            front_dir = glm.vec3(np.sin(g_cam_theta), 0.0, np.cos(g_cam_theta))
+            right_dir = glm.vec3(np.sin(g_cam_theta - np.pi / 2), 0.0, np.cos(g_cam_theta- np.pi / 2))
+            g_cam_center -= (front_dir * dy * pan_sens) - (right_dir * dx * pan_sens)
+        elif g_z_is_pressed:
+            # Zoom action
+            # 현재 방향을 유지하고 거리만 바꾸기 -> r 필요
+            # 마우스 양옆 움직임은 반영 X.
+            zoom_sens = 0.01
+            g_cam_r += dy * zoom_sens
+            # r은 음수 값이 될 수 없음.
+            g_cam_r = max(0.01, g_cam_r)
+        else:
+            # Orbit action
+            orbit_sens = 0.01
+            g_cam_theta -= dx * orbit_sens
+            g_cam_phi += dy * orbit_sens
+            # -90 ~ 90 으로만 제한. 예시에서 그렇게 구현되어있길래...
+            g_cam_phi = max(-np.pi / 2 + 0.0001, min(g_cam_phi, np.pi / 2 - 0.0001))
+    g_mouse_x_pos = xpos
+    g_mouse_y_pos = ypos
+
 
 
 def prepare_vao_oct():
@@ -146,46 +200,16 @@ def draw_oct(vao,MVP, loc_MVP):
     glDrawArrays(GL_TRIANGLES, 0, 24)
 
 
-def prepare_vao_triangle():
-    # prepare vertex data (in main memory)
-    vertices = glm.array(glm.float32,
-        # position        # color
-         0.0, 0.0, 0.0,  1.0, 0.0, 0.0, # v0
-         0.5, 0.0, 0.0,  0.0, 1.0, 0.0, # v1
-         0.0, 0.5, 0.0,  0.0, 0.0, 1.0, # v2
-    )
-
-    # create and activate VAO (vertex array object)
-    VAO = glGenVertexArrays(1)  # create a vertex array object ID and store it to VAO variable
-    glBindVertexArray(VAO)      # activate VAO
-
-    # create and activate VBO (vertex buffer object)
-    VBO = glGenBuffers(1)   # create a buffer object ID and store it to VBO variable
-    glBindBuffer(GL_ARRAY_BUFFER, VBO)  # activate VBO as a vertex buffer object
-
-    # copy vertex data to VBO
-    glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices.ptr, GL_STATIC_DRAW) # allocate GPU memory for and copy vertex data to the currently bound vertex buffer
-
-    # configure vertex positions
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), None)
-    glEnableVertexAttribArray(0)
-
-    # configure vertex colors
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), ctypes.c_void_p(3*glm.sizeof(glm.float32)))
-    glEnableVertexAttribArray(1)
-
-    return VAO
-
 def prepare_vao_frame():
     # prepare vertex data (in main memory)
     vertices = glm.array(glm.float32,
         # position        # color
          0.0, 0.0, 0.0,  1.0, 0.0, 0.0, # x-axis start
-         1.0, 0.0, 0.0,  1.0, 0.0, 0.0, # x-axis end 
+         3.0, 0.0, 0.0,  1.0, 0.0, 0.0, # x-axis end 
          0.0, 0.0, 0.0,  0.0, 1.0, 0.0, # y-axis start
-         0.0, 1.0, 0.0,  0.0, 1.0, 0.0, # y-axis end 
+         0.0, 3.0, 0.0,  0.0, 1.0, 0.0, # y-axis end 
          0.0, 0.0, 0.0,  0.0, 0.0, 1.0, # z-axis start
-         0.0, 0.0, 1.0,  0.0, 0.0, 1.0, # z-axis end 
+         0.0, 0.0, 3.0,  0.0, 0.0, 1.0, # z-axis end 
     )
 
     # create and activate VAO (vertex array object)
@@ -208,6 +232,7 @@ def prepare_vao_frame():
     glEnableVertexAttribArray(1)
 
     return VAO
+
 def prepare_vao_grid():
     # consist of many "pos[2], col[2]"...
     # pos[2] = [x, y ,z] but it is xz grid so y should be zero.
@@ -276,7 +301,9 @@ def main():
     glfwMakeContextCurrent(window)
 
     # register event callbacks
-    glfwSetKeyCallback(window, key_callback);
+    glfwSetMouseButtonCallback(window, button_callback)
+    glfwSetKeyCallback(window, key_callback)
+    glfwSetCursorPosCallback(window, cursor_callback)
 
     # load shaders
     shader_program = load_shaders(g_vertex_shader_src, g_fragment_shader_src)
@@ -285,7 +312,6 @@ def main():
     loc_MVP = glGetUniformLocation(shader_program, 'MVP')
     
     # prepare vaos
-    vao_triangle = prepare_vao_triangle()
     vao_frame = prepare_vao_frame()
     vao_grid, num_grid_vertices = prepare_vao_grid()
     vao_oct = prepare_vao_oct()
@@ -305,8 +331,16 @@ def main():
         P = glm.perspective(45,1,1,10)
 
         # view matrix
-        # rotate camera position with g_cam_ang / move camera up & down with g_cam_height
-        V = glm.lookAt(glm.vec3(5*np.sin(g_cam_ang),g_cam_height,5*np.cos(g_cam_ang)), glm.vec3(0,0,0), glm.vec3(0,1,0))
+        # r, theta, phi -> 실제 위치값으로 변환
+        eye_x = g_cam_center.x + g_cam_r * np.sin(g_cam_theta) * np.cos(g_cam_phi)
+        eye_y = g_cam_center.y + g_cam_r * np.sin(g_cam_phi)
+        eye_z = g_cam_center.z + g_cam_r * np.cos(g_cam_phi) * np.cos(g_cam_theta)
+        # lookAt(eye,center,up)
+        V = glm.lookAt(
+            glm.vec3(eye_x, eye_y, eye_z),
+            g_cam_center, 
+            glm.vec3(0,1,0)
+        )
 
         # current frame: P*V*I (now this is the world frame)
         I = glm.mat4()
