@@ -134,6 +134,7 @@ def cursor_callback(window, xpos, ypos):
             pan_sens = 0.01
             front_dir = glm.vec3(np.sin(g_cam_theta), 0.0, np.cos(g_cam_theta))
             right_dir = glm.vec3(np.sin(g_cam_theta - np.pi / 2), 0.0, np.cos(g_cam_theta- np.pi / 2))
+            # right_dir은 + 해줘야지 생각처럼 작동함
             g_cam_center -= (front_dir * dy * pan_sens) - (right_dir * dx * pan_sens)
         elif g_z_is_pressed:
             # Zoom action
@@ -234,19 +235,17 @@ def prepare_vao_frame():
     return VAO
 
 def prepare_vao_grid():
-    # consist of many "pos[2], col[2]"...
-    # pos[2] = [x, y ,z] but it is xz grid so y should be zero.
+    # "pos[2], col[2]"...
+    # pos[2] = [x, y ,z] 근데 y값은 무조건 0으로 
     grid = []
     def rectangle(color,x,z):
         c = color
-        #lower triangle 1-3
         grid.extend([x,0,z] + c)
         grid.extend([x+1,0,z] + c)
         grid.extend([x,0,z+1] + c)
         grid.extend([x+1,0,z] + c)
         grid.extend([x+1,0,z+1] + c)
         grid.extend([x,0,z+1] + c)
-        # upper triangle 2-4
     wht = [0.8, 0.8, 0.8]
     blk = [0.2,0.2,0.2]
     for q in range(-5,5):
@@ -279,7 +278,6 @@ def prepare_vao_grid():
 def draw_gird(vao, num, MVP, loc_MVP):
     glBindVertexArray(vao)
     glUniformMatrix4fv(loc_MVP, 1, GL_FALSE, glm.value_ptr(MVP))
-    # 
     glDrawArrays(GL_TRIANGLES, 0, num)
     #glDrawArrays(GL_LINES, 0, 6)
 
