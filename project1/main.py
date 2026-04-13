@@ -143,7 +143,8 @@ def cursor_callback(window, xpos, ypos):
             zoom_sens = 0.01
             g_cam_r += dy * zoom_sens
             # r은 음수 값이 될 수 없음.
-            g_cam_r = max(0.01, g_cam_r)
+            # 너무 가까우면 좀 보기 그렇다.
+            g_cam_r = max(0.1, g_cam_r)
         else:
             # Orbit action
             orbit_sens = 0.01
@@ -155,7 +156,15 @@ def cursor_callback(window, xpos, ypos):
     g_mouse_x_pos = xpos
     g_mouse_y_pos = ypos
 
+def framebuffer_size_callback(window, width, height):
+    global g_P
 
+    glViewport(0, 0, width, height)
+
+    per_height = 10.
+    per_width = per_height * width/height
+    per_as = per_width/per_height
+    g_P = glm.perspective(45, per_as, 0.05, 10)
 
 def prepare_vao_oct():
     oct = []
@@ -204,14 +213,15 @@ def draw_oct(vao,MVP, loc_MVP):
 
 def prepare_vao_frame():
     # prepare vertex data (in main memory)
+    # grid 그리는데 사용하기 위해 y를 맨뒤 순서로 바꾸기
     vertices = glm.array(glm.float32,
         # position        # color
-         0.0, 0.0, 0.0,  1.0, 0.0, 0.0, # x-axis start
+         -3.0, 0.0, 0.0,  1.0, 0.0, 0.0, # x-axis start
          3.0, 0.0, 0.0,  1.0, 0.0, 0.0, # x-axis end 
-         0.0, 0.0, 0.0,  0.0, 1.0, 0.0, # y-axis start
+         0.0, 0.0, -3.0,  0.0, 0.0, 1.0, # z-axis start
+         0.0, 0.0, 3.0,  0.0, 0.0, 1.0, # z-axis end
+         0.0, -3.0, 0.0,  0.0, 1.0, 0.0, # y-axis start
          0.0, 3.0, 0.0,  0.0, 1.0, 0.0, # y-axis end 
-         0.0, 0.0, 0.0,  0.0, 0.0, 1.0, # z-axis start
-         0.0, 0.0, 3.0,  0.0, 0.0, 1.0, # z-axis end 
     )
 
     # create and activate VAO (vertex array object)
@@ -235,26 +245,26 @@ def prepare_vao_frame():
 
     return VAO
 
-def prepare_vao_grid():
+def prepare_vao_check():
     # "pos[2], col[2]"...
     # pos[2] = [x, y ,z] 근데 y값은 무조건 0으로 
-    grid = []
+    check = []
     def rectangle(color,x,z):
         c = color
-        grid.extend([x,0,z] + c)
-        grid.extend([x+1,0,z] + c)
-        grid.extend([x,0,z+1] + c)
-        grid.extend([x+1,0,z] + c)
-        grid.extend([x+1,0,z+1] + c)
-        grid.extend([x,0,z+1] + c)
+        check.extend([x,0,z] + c)
+        check.extend([x+1,0,z] + c)
+        check.extend([x,0,z+1] + c)
+        check.extend([x+1,0,z] + c)
+        check.extend([x+1,0,z+1] + c)
+        check.extend([x,0,z+1] + c)
     wht = [0.8, 0.8, 0.8]
     blk = [0.2,0.2,0.2]
-    for q in range(-5,5):
-        for w in range(-5,5):
-            if (abs(q+w) % 2) : rectangle(wht,q,w)
-            else : rectangle(blk,q,w)
+    rectangle(wht,-5,-5)
+    rectangle(blk,-4,-5)
+    rectangle(blk,-5,-4)
+    rectangle(wht,-4,-4)
 
-    vertices = glm.array(glm.float32, *grid)
+    vertices = glm.array(glm.float32, *check)
     # create and activate VAO (vertex array object)
     VAO = glGenVertexArrays(1)  # create a vertex array object ID and store it to VAO variable
     glBindVertexArray(VAO)      # activate VAO
@@ -273,14 +283,31 @@ def prepare_vao_grid():
     # configure vertex colors
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), ctypes.c_void_p(3*glm.sizeof(glm.float32)))
     glEnableVertexAttribArray(1)
-    num = len(vertices) // 6
-    return VAO, num
+    #num = len(vertices) // 6
+    return VAO
 
-def draw_gird(vao, num, MVP, loc_MVP):
+def draw_check(vao, MVP, loc_MVP):
     glBindVertexArray(vao)
-    glUniformMatrix4fv(loc_MVP, 1, GL_FALSE, glm.value_ptr(MVP))
-    glDrawArrays(GL_TRIANGLES, 0, num)
-    #glDrawArrays(GL_LINES, 0, 6)
+    for q in range(5):
+        for w in range(5):
+            MVP_check = MVP * glm.translate(glm.vec3(1*q, 0, 1*w))* glm.scale(glm.vec3(.5,.5,.5))
+            glUniformMatrix4fv(loc_MVP, 1, GL_FALSE, glm.value_ptr(MVP_check))
+            glDrawArrays(GL_TRIANGLES, 0, 24)
+
+def draw_grid(vao, MVP, loc_MVP):
+    glBindVertexArray(vao)
+    scale = 3
+    MVP_ = MVP * glm.scale(glm.vec3(scale,scale,scale)) 
+    # 길이 늘리기, 반전시켜서 
+    for q in range(-8,7):
+        for w in range(-7,8):
+            #MVP_grid *= glm.rotate(glm.radians(90),glm.vec3(0,1,0))
+            #* glm.scale(glm.vec3(5,5,5))
+            #* glm.rotate(glm.radians(90),glm.vec3(0,1,0))
+            MVP_grid = MVP_ * glm.translate(glm.vec3(1*q/scale, 0, 1*w/scale))
+            glUniformMatrix4fv(loc_MVP, 1, GL_FALSE, glm.value_ptr(MVP_grid))
+            glDrawArrays(GL_LINES, 0, 4)
+
 
 
 def main():
@@ -303,6 +330,8 @@ def main():
     glfwSetMouseButtonCallback(window, button_callback)
     glfwSetKeyCallback(window, key_callback)
     glfwSetCursorPosCallback(window, cursor_callback)
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback)
+
 
     # load shaders
     shader_program = load_shaders(g_vertex_shader_src, g_fragment_shader_src)
@@ -312,7 +341,7 @@ def main():
     
     # prepare vaos
     vao_frame = prepare_vao_frame()
-    vao_grid, num_grid_vertices = prepare_vao_grid()
+    vao_check=  prepare_vao_check()
     vao_oct = prepare_vao_oct()
 
     # loop until the user closes the window
@@ -327,7 +356,7 @@ def main():
 
         # projection matrix        
         #P = glm.ortho(-1,1,-1,1,-1,1)
-        P = glm.perspective(45,1,1,10)
+        P = glm.perspective(45,1,1,2*g_cam_r)
 
         # view matrix
         # r, theta, phi -> 실제 위치값으로 변환
@@ -348,11 +377,12 @@ def main():
 
         # draw current frame --> xyz axis
         glBindVertexArray(vao_frame)
-        glDrawArrays(GL_LINES, 0, 6)
+        # glDrawArrays(GL_LINES, 0, 6)
+        draw_grid(vao_frame, MVP, loc_MVP)
         
-        # draw grid
-        glBindVertexArray(vao_grid)
-        draw_gird(vao_grid, num_grid_vertices, MVP,loc_MVP)
+        # draw check
+        glBindVertexArray(vao_check)
+        draw_check(vao_check, MVP, loc_MVP)
         # animating
         t = glfwGetTime()
 
