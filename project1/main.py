@@ -149,7 +149,8 @@ def cursor_callback(window, xpos, ypos):
             orbit_sens = 0.01
             g_cam_theta -= dx * orbit_sens
             g_cam_phi += dy * orbit_sens
-            # -90 ~ 90 으로만 제한. 예시에서 그렇게 구현되어있길래...
+            # -90 ~ 90 으로만 제한. 예시에서 그렇게 구현되어있고,
+            # 그 이상으로 가버리면 상하 컨트롤이 정반대가 되어서 불편함
             g_cam_phi = max(-np.pi / 2 + 0.0001, min(g_cam_phi, np.pi / 2 - 0.0001))
     g_mouse_x_pos = xpos
     g_mouse_y_pos = ypos

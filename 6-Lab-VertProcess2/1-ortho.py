@@ -293,10 +293,10 @@ def main():
         # M = R
 
         # draw cube w.r.t. the current frame MVP
-        draw_cube(vao_cube, P*V*M, loc_MVP)
+        #draw_cube(vao_cube, P*V*M, loc_MVP)
 
         # # draw cube array w.r.t. the current frame MVP
-        # draw_cube_array(vao_cube, P*V*M, loc_MVP)
+        draw_cube_array(vao_cube, P*V*M, loc_MVP)
 
 
         # swap front and back buffers

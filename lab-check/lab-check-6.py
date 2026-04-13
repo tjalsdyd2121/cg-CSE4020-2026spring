@@ -108,9 +108,11 @@ def framebuffer_size_callback(window, width, height):
 
     glViewport(0, 0, width, height)
 
-    ortho_height = 10.
-    ortho_width = ortho_height * width/height
-    g_P = glm.ortho(-ortho_width*.5,ortho_width*.5, -ortho_height*.5,ortho_height*.5, 5,10)
+    per_height = 10.
+    per_width = per_height * width/height
+    per_as = per_width/per_height
+    g_P = glm.perspective(45, per_as, 0.05, 10)
+    #g_P = glm.ortho(-ortho_width*.5,ortho_width*.5, -ortho_height*.5,ortho_height*.5, -10,10)
 
 def prepare_vao_cube():
     # prepare vertex data (in main memory)
@@ -251,7 +253,7 @@ def main():
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE) # for macOS
 
     # create a window and OpenGL context
-    window = glfwCreateWindow(800, 800, '5-viewport-fit-preserve-objratio-ortho', None, None)
+    window = glfwCreateWindow(800, 800, '2022056562-labcheck-6', None, None)
     if not window:
         glfwTerminate()
         return
@@ -275,9 +277,10 @@ def main():
     # glViewport(100,100, 200,200)
 
     # initialize projection matrix
-    ortho_height = 10.
-    ortho_width = ortho_height * 800/800    # initial width/height
-    g_P = glm.ortho(-ortho_width*.5,ortho_width*.5, -ortho_height*.5,ortho_height*.5, -10,10)
+    per_height = 10.
+    per_width = per_height * 800/800
+    per_as = per_width/per_height
+    g_P = glm.perspective(45, per_as, 0.05, 10)
 
     # loop until the user closes the window
     while not glfwWindowShouldClose(window):
