@@ -12,6 +12,8 @@ g_cam_phi = np.radians(45)
 
 # fittable viewport 사용
 g_P = glm.mat4()
+g_height = 1000
+g_width = 1000
 
 # centor point 위치
 g_cam_center = glm.vec3(0.0,0.0,0.0)
@@ -161,13 +163,11 @@ def cursor_callback(window, xpos, ypos):
 
 def framebuffer_size_callback(window, width, height):
     global g_P, g_cam_r
-
     glViewport(0, 0, width, height)
-
     per_height = 10.
     per_width = per_height * width/height
     per_as = per_width/per_height
-    g_P = glm.perspective(45, per_as, 0.05, 2*g_cam_r)
+    g_P = glm.perspective(45, per_as, 0.05, 2* g_cam_r)
 
 def prepare_vao_oct():
     oct = []
@@ -301,20 +301,14 @@ def draw_grid(vao, MVP, loc_MVP):
     glBindVertexArray(vao)
     scale = 3
     MVP_ = MVP * glm.scale(glm.vec3(scale,scale,scale)) 
-    # 길이 늘리기, 반전시켜서 
     for q in range(-8,7):
         for w in range(-7,8):
-            #MVP_grid *= glm.rotate(glm.radians(90),glm.vec3(0,1,0))
-            #* glm.scale(glm.vec3(5,5,5))
-            #* glm.rotate(glm.radians(90),glm.vec3(0,1,0))
             MVP_grid = MVP_ * glm.translate(glm.vec3(1*q/scale, 0, 1*w/scale))
             glUniformMatrix4fv(loc_MVP, 1, GL_FALSE, glm.value_ptr(MVP_grid))
             glDrawArrays(GL_LINES, 0, 4)
 
-
-
 def main():
-    global g_P
+    global g_P, g_cam_r
     # initialize glfw
     if not glfwInit():
         return
@@ -353,7 +347,7 @@ def main():
     # 1대1 비율로 생성
     per_width = per_height
     per_as = per_width/per_height
-    g_P = glm.perspective(45, per_as, 0.05, 10)
+    g_P = glm.perspective(45, per_as, 0.05, 2 * g_cam_r)
 
     # loop until the user closes the window
     while not glfwWindowShouldClose(window):
@@ -365,6 +359,11 @@ def main():
 
         glUseProgram(shader_program)
 
+        width, height = glfwGetWindowSize(window)
+        per_height = 10.
+        per_width = per_height * width/height
+        per_as = per_width/per_height
+        g_P = glm.perspective(45, per_as, 0.05, 2* g_cam_r)
         # projection matrix        
         #P = glm.ortho(-1,1,-1,1,-1,1)
         #P = glm.perspective(45,1,1,2*g_cam_r)
@@ -388,7 +387,7 @@ def main():
 
         # draw current frame --> xyz axis
         glBindVertexArray(vao_frame)
-        # glDrawArrays(GL_LINES, 0, 6)
+        glDrawArrays(GL_LINES, 0, 6)
         draw_grid(vao_frame, MVP, loc_MVP)
         
         # draw check
