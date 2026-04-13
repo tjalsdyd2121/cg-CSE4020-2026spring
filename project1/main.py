@@ -10,6 +10,9 @@ g_cam_r = 5.0
 g_cam_theta = np.radians(45)
 g_cam_phi = np.radians(45)
 
+# fittable viewport 사용
+g_P = glm.mat4()
+
 # centor point 위치
 g_cam_center = glm.vec3(0.0,0.0,0.0)
 # 마우스
@@ -157,14 +160,14 @@ def cursor_callback(window, xpos, ypos):
     g_mouse_y_pos = ypos
 
 def framebuffer_size_callback(window, width, height):
-    global g_P
+    global g_P, g_cam_r
 
     glViewport(0, 0, width, height)
 
     per_height = 10.
     per_width = per_height * width/height
     per_as = per_width/per_height
-    g_P = glm.perspective(45, per_as, 0.05, 10)
+    g_P = glm.perspective(45, per_as, 0.05, 2*g_cam_r)
 
 def prepare_vao_oct():
     oct = []
@@ -311,6 +314,7 @@ def draw_grid(vao, MVP, loc_MVP):
 
 
 def main():
+    global g_P
     # initialize glfw
     if not glfwInit():
         return
@@ -344,6 +348,13 @@ def main():
     vao_check=  prepare_vao_check()
     vao_oct = prepare_vao_oct()
 
+    # initialize projection matrix
+    per_height = 10.
+    # 1대1 비율로 생성
+    per_width = per_height
+    per_as = per_width/per_height
+    g_P = glm.perspective(45, per_as, 0.05, 10)
+
     # loop until the user closes the window
     while not glfwWindowShouldClose(window):
         # render
@@ -356,7 +367,7 @@ def main():
 
         # projection matrix        
         #P = glm.ortho(-1,1,-1,1,-1,1)
-        P = glm.perspective(45,1,1,2*g_cam_r)
+        #P = glm.perspective(45,1,1,2*g_cam_r)
 
         # view matrix
         # r, theta, phi -> 실제 위치값으로 변환
@@ -372,7 +383,7 @@ def main():
 
         # current frame: P*V*I (now this is the world frame)
         I = glm.mat4()
-        MVP = P*V*I
+        MVP = g_P*V*I
         glUniformMatrix4fv(loc_MVP, 1, GL_FALSE, glm.value_ptr(MVP))
 
         # draw current frame --> xyz axis
@@ -403,7 +414,7 @@ def main():
         # M = T @ R
 
         # current frame: P*V*M
-        MVP = P*V*M
+        MVP = g_P*V*M
         glUniformMatrix4fv(loc_MVP, 1, GL_FALSE, glm.value_ptr(MVP))
 
         # draw triangle w.r.t. the current frame
