@@ -223,7 +223,9 @@ def draw_cube_array(vao, MVP, loc_MVP):
     for i in range(5):
         for j in range(5):
             for k in range(5):
-                MVP_cube = MVP * glm.translate(glm.vec3(1*i, 1*j, 1*k)) * glm.scale(glm.vec3(.5,.5,.5))
+                MVP_cube = MVP  * glm.scale(glm.vec3(.5,.5,.5))* glm.translate(glm.vec3(1*i, 1*j, 1*k))
+                #MVP_cube = MVP * glm.translate(glm.vec3(1*i, 1*j, 1*k)) * glm.scale(glm.vec3(.5,.5,.5))
+
                 glUniformMatrix4fv(loc_MVP, 1, GL_FALSE, glm.value_ptr(MVP_cube))
                 glDrawArrays(GL_TRIANGLES, 0, 36)
 
@@ -301,7 +303,7 @@ def main():
         draw_cube(vao_cube, P*V*M, loc_MVP)
 
         # # draw cube array w.r.t. the current frame MVP
-        # draw_cube_array(vao_cube, P*V*M, loc_MVP)
+        draw_cube_array(vao_cube, P*V*M, loc_MVP)
 
 
         # swap front and back buffers

@@ -271,7 +271,7 @@ def main():
 
     # create a hirarchical model - Node(parent, shape_transform, color)
     base = Node(None, glm.scale((.2,.2,0.)), glm.vec3(0,0,1))
-    arm = Node(base, glm.translate((.5,0,.01)) * glm.scale((.5,.1,0.)), glm.vec3(1,0,0))
+    arm = Node(base, glm.scale((.5,.1,0.)), glm.vec3(1,0,0))
 
     # loop until the user closes the window
     while not glfwWindowShouldClose(window):
@@ -294,7 +294,9 @@ def main():
 
         # set local transformations of each node
         base.set_transform(glm.translate((glm.sin(t),0,0)))
-        arm.set_transform(glm.translate((.2, 0, 0)) * glm.rotate(t, (0,0,1)))
+        #arm.set_transform(glm.translate((.2, 0, 0)) * glm.rotate(t, (0,0,1)))
+        #arm.set_transform(glm.translate((.2, 0, 0)) * glm.rotate(np.pi /2, (0,0,1)))
+        arm.set_transform(glm.rotate(t, (0,0,1)))
 
         # recursively update global transformations of all nodes
         base.update_tree_global_transform()

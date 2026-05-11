@@ -115,7 +115,7 @@ def main():
     # update uniforms 
     glUseProgram(shader_program)    # updating uniform require you to first activate the shader program 
 
-    use_numpy = True
+    use_numpy = False
     # use_numpy = False
 
     if(use_numpy):
@@ -172,14 +172,14 @@ def main():
         # M = glm.mat2(-1., 0.,
                      # 0., 1.)
 
-        # # shearing in x
-        # # # not this matrix!:
-        # # M = glm.mat2(1., 2.,
-                     # # 0., 1.)
+        # shearing in x
+        # not this matrix!:
+        M = glm.mat2(1., 2.,
+                     0., 1.)
         # # note that glm matrix is column-major (numpy array is row-major)
         # # correct matrix is:
         # M = glm.mat2(1., 0.,
-                     # 2., 1.)
+        #              2., 1.)
 
         # # rotation
         # th = glm.radians(30)

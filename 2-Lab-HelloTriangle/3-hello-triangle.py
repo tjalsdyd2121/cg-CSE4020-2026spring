@@ -120,16 +120,18 @@ def main():
     glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices.ptr, GL_STATIC_DRAW) # allocate GPU memory for and copy vertex data to the currently bound vertex buffer
 
     # configure vertex attributes
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * glm.sizeof(glm.float32), None)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 2 * glm.sizeof(glm.float32), None)
     glEnableVertexAttribArray(0)
+
+    glUseProgram(shader_program)
+    #glBindVertexArray(VAO)
 
     # loop until the user closes the window
     while not glfwWindowShouldClose(window):
         # render
         glClear(GL_COLOR_BUFFER_BIT)
 
-        glUseProgram(shader_program)
-        glBindVertexArray(VAO)
+        
         glDrawArrays(GL_TRIANGLES, 0, 3)
 
         # swap front and back buffers

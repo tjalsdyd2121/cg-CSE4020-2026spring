@@ -110,7 +110,7 @@ def framebuffer_size_callback(window, width, height):
 
     ortho_height = 10.
     ortho_width = ortho_height * width/height
-    g_P = glm.ortho(-ortho_width*.5,ortho_width*.5, -ortho_height*.5,ortho_height*.5, 5,10)
+    g_P = glm.ortho(-ortho_width*.5,ortho_width*.5, -ortho_height*.5,ortho_height*.5, -10,10)
 
 def prepare_vao_cube():
     # prepare vertex data (in main memory)
@@ -328,4 +328,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

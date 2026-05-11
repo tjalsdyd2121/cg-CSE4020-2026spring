@@ -350,8 +350,13 @@ def main():
         # ZYX Euler angles
         t = glfwGetTime()
         xang = t
+        xang = 0
+
         yang = glm.radians(30)
+        #yang = t * 0.2
         zang = glm.radians(30)
+        zang = t
+
         Rx = glm.rotate(xang, (1,0,0))
         Ry = glm.rotate(yang, (0,1,0))
         Rz = glm.rotate(zang, (0,0,1))
@@ -363,6 +368,7 @@ def main():
 
         # draw cubes
         M = M * glm.scale((.25, .25, .25))
+        #M = M * glm.scale((.2, .2, .2))
 
         Mo = M * glm.mat4()
         draw_cube(vao_cube, P*V*Mo, Mo, glm.vec3(.5,.5,.5), unif_locs_lighting)
