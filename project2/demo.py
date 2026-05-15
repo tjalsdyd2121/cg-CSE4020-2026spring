@@ -4,6 +4,7 @@ import glm
 import ctypes
 import numpy as np
 import os
+import collections 
 
 # Orbit -> 구면좌표계 사용 
 # eye point 위치와 up vector 표현가능
@@ -264,7 +265,12 @@ def key_callback(window, key, scancode, action, mods):
             g_f_is_pressed = False
 
 def cursor_callback(window, xpos, ypos):
-    global g_cam_r, g_cam_theta, g_cam_phi, g_cam_center, g_mouse_is_dragged, g_mouse_x_pos, g_mouse_y_pos,g_x_is_pressed, g_z_is_pressed
+    global g_cam_r, g_cam_theta, g_cam_phi, g_cam_center, g_mouse_is_dragged, g_mouse_x_pos, g_mouse_y_pos,g_x_is_pressed, g_z_is_pressed, g_f_is_pressed
+    
+    # if g_f_is_pressed :
+    #     g_cam_center = 
+
+
 
     if g_mouse_is_dragged:
         # xpos는 parameter로 실시간 들어오는 현재 위치
@@ -356,7 +362,7 @@ def draw_grid(vao, MVP, loc_MVP):
             glUniformMatrix4fv(loc_MVP, 1, GL_FALSE, glm.value_ptr(MVP_grid))
             glDrawArrays(GL_LINES, 0, 4)
 
-# obj 파일 불러오기.. 
+# obj 파일 불러오기.. 삼각형 데이터만 있다고 가정.
 def load_obj(filename):
     vertices = []
     normals = []
@@ -382,21 +388,13 @@ def load_obj(filename):
                 for v_data in parts[1:]:
                     sub_parts = v_data.split('/')
                     # faces 는 1-based indices !! 마이너스 1
-                    v_idx = int(sub_parts[0]) - 1
-                    
-                    # (v/vt/vn)인 경우
-                    if len(sub_parts) >= 3 and sub_parts[2] != '':
-                        vn_idx = int(sub_parts[2]) - 1
-                    # (v//vn)인 경우
-                    elif len(sub_parts) == 2 and v_data.count('//') == 1:
-                        vn_idx = int(sub_parts[1]) - 1
-                    # (v) 만 있는 경우... 그냥 normal = (0,0,0) 으로 준다
-                    else:
-                        vn_idx = 0 
-                        
+                    v_idx = int(sub_parts[0]) - 1 
+                    # 전부 다 v/vt/vn 형태의 데이터만 있음
+                    vn_idx = int(sub_parts[2]) - 1
+                
                     face_info.append((v_idx, vn_idx))
                 
-                # Triangulation 사용
+                # 다각형을 삼각형으로 분할 (Triangulation)
                 for i in range(1, len(face_info) - 1):
                     faces.append([face_info[0], face_info[i], face_info[i+1]])
 
@@ -469,7 +467,7 @@ def draw_node(node, VP, loc_MVP, loc_M, loc_object_color):
         draw_node(child, VP, loc_MVP, loc_M, loc_object_color)
 
 def main():
-    global g_P, g_cam_r, g_cam_center, g_f_is_pressed 
+    global g_P, g_cam_r, g_f_is_pressed
     # initialize glfw
     if not glfwInit():
         return
@@ -515,19 +513,57 @@ def main():
     vao_saturn, vcnt_saturn   = load_and_prepare_obj('saturn.obj')
     vao_earth, vcnt_earth     = load_and_prepare_obj('earth.obj')
     vao_moon, vcnt_moon       = load_and_prepare_obj('moon.obj')
+    vao_pipe, vcnt_pipe       = load_and_prepare_obj('pipe.obj')
 
     color_sun     = glm.vec3(1.0, 0.9, 0.0)
     color_jupiter = glm.vec3(0.8, 0.6, 0.4)
     color_saturn  = glm.vec3(0.9, 0.8, 0.6)
     color_earth   = glm.vec3(0.2, 0.4, 0.8)
     color_moon    = glm.vec3(0.7, 0.7, 0.7)
+    color_pipe    = glm.vec3(0.0, 1.0, 0.8)
     
     sun = Node(None, glm.scale(glm.vec3(0.6)), color_sun, vao_sun, vcnt_sun)
     earth = Node(sun, glm.scale(glm.vec3(0.6)), color_earth, vao_earth,vcnt_earth)
-    moon = Node(earth, glm.scale(glm.vec3(0.9)), color_moon, vao_moon,vcnt_moon)
+    moon = Node(earth, glm.scale(glm.vec3(0.3)), color_moon, vao_moon,vcnt_moon)
     saturn = Node(sun, glm.scale(glm.vec3(0.8)), color_saturn, vao_saturn,vcnt_saturn)
     jupiter = Node(sun, glm.scale(glm.vec3(0.4)), color_jupiter, vao_jupiter,vcnt_jupiter)
-   
+    # pipe_jup = Node(jupiter, glm.scale(glm.vec3(0.6)), color_jupiter, vao_pipe, vcnt_pipe)
+    # pipe2_jup = Node(pipe_jup, glm.scale(glm.vec3(0.3)), color_jupiter, vao_pipe, vcnt_pipe)
+
+    # --- 궤적(Trail) 설정을 위한 변수 ---
+    num_pipes = 150
+    # 궤적을 만들 행성 목록
+    planets_with_trails = [earth, saturn, jupiter]
+    
+    # 각 행성별 과거 위치 저장용 큐
+    trail_histories = {
+        planet: collections.deque(maxlen=num_pipes + 1) 
+        for planet in planets_with_trails
+    }
+    
+    # 각 행성의 자식으로 파이프 노드 15개씩 생성
+    # 이렇게 하면 draw_node(planet, ...) 호출 시 파이프들도 자동으로 그려집니다.
+    for planet in planets_with_trails:
+        for _ in range(num_pipes):
+            # 초기에는 크기를 0으로 해서 숨겨둠
+            Node(parent=planet, shape_transform=glm.mat4(1.0), 
+                 color=color_pipe, vao=vao_pipe, vertex_count=vcnt_pipe)
+    # num_pipes = 15 # 자취를 남길 파이프의 개수 (꼬리 길이)
+    # planets_with_trails = [earth, saturn, jupiter] # 궤적을 그릴 행성들
+    
+    # # 각 행성별 과거 월드 위치를 저장할 Queue (파이프 개수 + 1 만큼 필요)
+    # trail_history = {
+    #     planet: collections.deque(maxlen=num_pipes + 1)
+    #     for planet in planets_with_trails
+    # }
+    
+    # # 각 행성별 파이프 자식 노드들 생성 (렌더링은 부모가 그려질 때 자동으로 됨)
+    # trail_pipes = { planet: [] for planet in planets_with_trails }
+    # for planet in planets_with_trails:
+    #     for i in range(num_pipes):
+    #         pipe_node = Node(planet, glm.mat4(), color_pipe, vao_pipe, vcnt_pipe)
+    #         trail_pipes[planet].append(pipe_node)
+
     # initialize projection matrix
     per_height = 10.
     # 1대1 비율로 생성
@@ -564,6 +600,8 @@ def main():
         )
 
         # current frame: P*V*I (now this is the world frame)
+        I = glm.mat4()
+        MVP = g_P*V*I
         glUseProgram(shader_program_frame)
         VP = g_P * V
         draw_frame(vao_frame, VP , loc_MVP_frame)
@@ -572,17 +610,64 @@ def main():
         # animating
         t = glfwGetTime()
         
-        sun.set_transform(glm.rotate(t * 1, glm.vec3(0, 1, 0)) * glm.translate(glm.vec3(12.0, 0, 0)))
+        #sun.set_transform(glm.rotate(t * 1, glm.vec3(0, 1, 0)) * glm.translate(glm.vec3(12.0, 0, 0)))
+        sun.set_transform(glm.translate(glm.vec3(0, 0, t)))
+
         earth.set_transform(glm.rotate(t * 1, glm.vec3(0, 0, 1)) * glm.translate(glm.vec3(0, 6.0, 0)))
         saturn.set_transform((glm.rotate(t * 0.5, glm.vec3(0, 0, 1)) * glm.translate(glm.vec3(0, 8.0, 0))))
         moon.set_transform((glm.rotate(t * 1.5, glm.vec3(0, 1, 0)) * glm.translate(glm.vec3(3.0, 0, 0))))
         jupiter.set_transform((glm.rotate(t * 0.8, glm.vec3(0, 0, 1)) * glm.translate(glm.vec3(0, 10.0, 0))))
- 
+        # pipe_jup.set_transform(glm.translate(glm.vec3(0, 0, 1.5)))
+        # pipe2_jup.set_transform(glm.translate(glm.vec3(0, 0, 1)))
         sun.update_tree_global_transform()
 
-        if g_f_is_pressed:
-            g_cam_center = glm.vec3(sun.get_global_transform()[3])
-       
+        # --- [수정] 파이프 궤적 업데이트 로직 ---
+        for planet in planets_with_trails:
+            curr_world_pos = glm.vec3(planet.get_global_transform()[3])
+            trail_histories[planet].appendleft(curr_world_pos)
+            
+            inv_global = glm.inverse(planet.get_global_transform())
+            history = trail_histories[planet]
+            pipes = planet.children 
+            
+            for i in range(len(history) - 1):
+                if i >= len(pipes): break
+                
+                p1_local = glm.vec3(inv_global * glm.vec4(history[i], 1.0))
+                p2_local = glm.vec3(inv_global * glm.vec4(history[i+1], 1.0))
+                
+                diff = p2_local - p1_local
+                dist = glm.length(diff)
+                
+                if dist > 0.001:
+                    mid = (p1_local + p2_local) * 0.5
+                    T = glm.translate(mid)
+                    
+                    direction = diff / dist
+                    base_up = glm.vec3(0, 1, 0) # 일반적인 obj는 Y축이 위쪽임
+                    
+                    dot_val = glm.dot(base_up, direction)
+                    if dot_val < -0.999:
+                        R = glm.rotate(glm.pi(), glm.vec3(1, 0, 0))
+                    else:
+                        q = glm.quat(base_up, direction)
+                        R = glm.mat4_cast(q)
+                    
+                    # 두께와 길이를 동시에 적용
+                    thickness = 0.06 * (1.0 - (i / num_pipes))
+                    S = glm.scale(glm.vec3(thickness, dist, thickness))
+                    
+                    pipes[i].set_transform(T * R * S)
+                else:
+                    # 이동 거리가 없으면 숨김
+                    pipes[i].set_transform(glm.scale(glm.vec3(0)))
+
+        sun.update_tree_global_transform()
+        # rotation
+        th = np.radians(t*90)
+        R = glm.rotate(th, glm.vec3(0,1,0))
+        M = R
+
         glUseProgram(shader_program_sun)
         draw_node_sun(sun, VP, loc_MVP_sun, loc_color_sun)
 
@@ -597,7 +682,15 @@ def main():
         draw_node(saturn, VP, loc_MVP_light, loc_M_light, loc_object_color_light)
         draw_node(moon, VP, loc_MVP_light, loc_M_light, loc_object_color_light)
         draw_node(jupiter, VP, loc_MVP_light, loc_M_light, loc_object_color_light)
-       
+        # draw_node(pipe_jup, VP, loc_MVP_light, loc_M_light, loc_object_color_light)
+        # draw_node(pipe2_jup, VP, loc_MVP_light, loc_M_light, loc_object_color_light)
+
+        # current frame: P*V*M
+
+        # glUseProgram(shader_program_frame)
+        # VP = g_P*V
+        # draw_frame(vao_frame, VP, loc_MVP_frame)
+
         # swap front and back buffers
         glfwSwapBuffers(window)
 
