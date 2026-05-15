@@ -3,10 +3,11 @@ from glfw.GLFW import *
 import glm
 import ctypes
 import numpy as np
+import os
 
 # Orbit -> 구면좌표계 사용 
 # eye point 위치와 up vector 표현가능
-g_cam_r = 5.0
+g_cam_r = 30.0
 g_cam_theta = np.radians(45)
 g_cam_phi = np.radians(45)
 
@@ -154,16 +155,20 @@ void main()
 
 class Node:
     def __init__(self, parent, shape_transform, color, vao, vertex_count):
+        # hierarchy
         self.parent = parent
         self.children = []
         if parent is not None:
             parent.children.append(self)
-
+        
+        # transform
         self.transform = glm.mat4()
         self.global_transform = glm.mat4()
-
+        
+        # shape
         self.shape_transform = shape_transform
         self.color = color
+        # vao 랑 vertex count 값도 node가 보유.
         self.vao = vao
         self.vertex_count = vertex_count
 
@@ -346,6 +351,110 @@ def draw_grid(vao, MVP, loc_MVP):
             glUniformMatrix4fv(loc_MVP, 1, GL_FALSE, glm.value_ptr(MVP_grid))
             glDrawArrays(GL_LINES, 0, 4)
 
+# obj 파일 불러오기.. 삼각형 데이터만 있다고 가정.
+def load_obj(filename):
+    vertices = []
+    normals = []
+    faces = []
+
+    with open(filename, 'r') as f:
+        for line in f:
+            parts = line.strip().split()
+            if not parts: continue
+
+            # (v x y z)
+            if parts[0] == 'v':
+                vertices.append([float(parts[1]), float(parts[2]), float(parts[3])])
+            
+            # (vn nx ny nz)
+            elif parts[0] == 'vn':
+                normals.append([float(parts[1]), float(parts[2]), float(parts[3])])
+            
+            # (f v1/vt1/vn1 v2/vt2/vn2 ...)
+            # 어짜피 mtl 파일 사용안하니까 vt는 무시하기
+            elif parts[0] == 'f':
+                face_info = []
+                for v_data in parts[1:]:
+                    sub_parts = v_data.split('/')
+                    # faces 는 1-based indices !! 마이너스 1
+                    v_idx = int(sub_parts[0]) - 1 
+                    # 전부 다 v/vt/vn 형태의 데이터만 있음
+                    vn_idx = int(sub_parts[2]) - 1
+                
+                    face_info.append((v_idx, vn_idx))
+                
+                # 다각형을 삼각형으로 분할 (Triangulation)
+                for i in range(1, len(face_info) - 1):
+                    faces.append([face_info[0], face_info[i], face_info[i+1]])
+
+    # centering... obj 파일 분리 할 때 0,0,0 에 안맞추고 export 해버림...
+    v_np = np.array(vertices, dtype=np.float32)
+    center = (np.min(v_np, axis=0) + np.max(v_np, axis=0)) / 2.0
+    
+    final_vertex_data = []
+    for tri in faces:
+        for v_idx, vn_idx in tri:
+            pos = np.array(vertices[v_idx]) - center
+            final_vertex_data.extend(pos)
+            final_vertex_data.extend(normals[vn_idx])
+
+    return np.array(final_vertex_data, dtype=np.float32), len(faces) * 3
+
+def prepare_vao_obj(vertex_data, vertex_count):
+    v_array = glm.array(glm.float32, *vertex_data)
+    
+    # create and activate VAO (vertex array object)
+    VAO = glGenVertexArrays(1)  # create a vertex array object ID and store it to VAO variable
+    glBindVertexArray(VAO)      # activate VAO
+
+    # create and activate VBO (vertex buffer object)
+    VBO = glGenBuffers(1)   # create a buffer object ID and store it to VBO variable
+    glBindBuffer(GL_ARRAY_BUFFER, VBO)  # activate VBO as a vertex buffer object
+
+    # copy vertex data to VBO
+    glBufferData(GL_ARRAY_BUFFER, v_array.nbytes, v_array.ptr, GL_STATIC_DRAW) # allocate GPU memory for and copy vertex data to the currently bound vertex buffer
+
+    # configure vertex positions
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), None)
+    glEnableVertexAttribArray(0)
+
+    # configure vertex normals
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), ctypes.c_void_p(3*glm.sizeof(glm.float32)))
+    glEnableVertexAttribArray(1)
+    # vertex count 값도 같이 출력
+    return VAO, vertex_count
+
+# os.path.join 사용 
+def load_and_prepare_obj(filename):
+    obj_path = os.path.join('.', filename)
+    obj_vertices, obj_faces = load_obj(obj_path)
+    return prepare_vao_obj(obj_vertices, obj_faces)
+
+# 태양 그리기 함수
+def draw_node_sun(node, VP, loc_MVP, loc_color):
+    MVP = VP * node.get_global_transform() * node.get_shape_transform()
+    color = node.get_color()
+    # vao 는 이제 본인이 소유
+    glBindVertexArray(node.get_vao())
+    glUniformMatrix4fv(loc_MVP, 1, GL_FALSE, glm.value_ptr(MVP))
+    glUniform3f(loc_color, color.r, color.g, color.b)
+    glDrawArrays(GL_TRIANGLES, 0, node.get_vertex_count())
+
+# 그 외 childe recursive 하게 그리기 
+def draw_node(node, VP, loc_MVP, loc_M, loc_object_color):
+    M = node.get_global_transform() * node.get_shape_transform()
+    MVP = VP * M
+    color = node.get_color()
+
+    glBindVertexArray(node.get_vao())
+    glUniformMatrix4fv(loc_MVP, 1, GL_FALSE, glm.value_ptr(MVP))
+    glUniformMatrix4fv(loc_M, 1, GL_FALSE, glm.value_ptr(M))
+    glUniform3f(loc_object_color, color.r, color.g, color.b)
+    glDrawArrays(GL_TRIANGLES, 0, node.get_vertex_count())
+    
+    for child in node.children:
+        draw_node(child, VP, loc_MVP, loc_M, loc_object_color)
+
 def main():
     global g_P, g_cam_r
     # initialize glfw
@@ -371,13 +480,44 @@ def main():
 
 
     # load shaders
-    shader_program = load_shaders(g_vertex_shader_src_color_attribute, g_fragment_shader_src_color)
-
+    shader_program_frame = load_shaders(g_vertex_shader_src_color_attribute, g_fragment_shader_src_color)
+    shader_program_sun = load_shaders(g_vertex_shader_src_color_uniform, g_fragment_shader_src_color)
+    shader_program_others = load_shaders(g_vertex_shader_src_light, g_fragment_shader_src_light)
+    
     # get uniform locations
-    loc_MVP = glGetUniformLocation(shader_program, 'MVP')
+    loc_MVP_frame = glGetUniformLocation(shader_program_frame, 'MVP')
+    loc_MVP_sun = glGetUniformLocation(shader_program_sun, 'MVP')
+    loc_color_sun = glGetUniformLocation(shader_program_sun, 'color')    
+    loc_MVP_light = glGetUniformLocation(shader_program_others, 'MVP')
+    loc_M_light = glGetUniformLocation(shader_program_others, 'M')
+    loc_view_pos_light = glGetUniformLocation(shader_program_others, 'view_pos')
+    loc_light_pos_light = glGetUniformLocation(shader_program_others, 'light_pos')
+    loc_object_color_light = glGetUniformLocation(shader_program_others, 'material_color')
     
     # prepare vaos
     vao_frame = prepare_vao_frame()
+
+    vao_sun, vcnt_sun         = load_and_prepare_obj('sun.obj')
+    vao_jupiter, vcnt_jupiter = load_and_prepare_obj('jupiter.obj')
+    vao_saturn, vcnt_saturn   = load_and_prepare_obj('saturn.obj')
+    vao_earth, vcnt_earth     = load_and_prepare_obj('earth.obj')
+    vao_moon, vcnt_moon       = load_and_prepare_obj('moon.obj')
+    vao_pipe, vcnt_pipe       = load_and_prepare_obj('pipe.obj')
+
+    color_sun     = glm.vec3(1.0, 0.9, 0.0)
+    color_jupiter = glm.vec3(0.8, 0.6, 0.4)
+    color_saturn  = glm.vec3(0.9, 0.8, 0.6)
+    color_earth   = glm.vec3(0.2, 0.4, 0.8)
+    color_moon    = glm.vec3(0.7, 0.7, 0.7)
+    #color_pipe    = glm.vec3(0.0, 1.0, 0.8)
+    
+    sun = Node(None, glm.scale(glm.vec3(0.6)), color_sun, vao_sun, vcnt_sun)
+    earth = Node(sun, glm.scale(glm.vec3(0.6)), color_earth, vao_earth,vcnt_earth)
+    moon = Node(earth, glm.scale(glm.vec3(0.3)), color_moon, vao_moon,vcnt_moon)
+    saturn = Node(sun, glm.scale(glm.vec3(0.8)), color_saturn, vao_saturn,vcnt_saturn)
+    jupiter = Node(sun, glm.scale(glm.vec3(0.4)), color_jupiter, vao_jupiter,vcnt_jupiter)
+    # pipe_jup = Node(jupiter, glm.scale(glm.vec3(0.6)), color_jupiter, vao_pipe, vcnt_pipe)
+    # pipe2_jup = Node(pipe_jup, glm.scale(glm.vec3(0.3)), color_jupiter, vao_pipe, vcnt_pipe)
 
     # initialize projection matrix
     per_height = 10.
@@ -394,7 +534,7 @@ def main():
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glEnable(GL_DEPTH_TEST)
 
-        glUseProgram(shader_program)
+        glUseProgram(shader_program_frame)
 
         width, height = glfwGetWindowSize(window)
         per_height = 10.
@@ -417,22 +557,50 @@ def main():
         # current frame: P*V*I (now this is the world frame)
         I = glm.mat4()
         MVP = g_P*V*I
-        draw_frame(vao_frame, MVP, loc_MVP)
-        draw_grid(vao_frame, MVP, loc_MVP)
+        glUseProgram(shader_program_frame)
+        VP = g_P * V
+        draw_frame(vao_frame, VP , loc_MVP_frame)
+        draw_grid(vao_frame, VP, loc_MVP_frame)
         
-        # draw check
         # animating
         t = glfwGetTime()
-
+        
+        sun.set_transform(glm.rotate(t * 1, glm.vec3(0, 1, 0)) * glm.translate(glm.vec3(12.0, 0, 0)))
+        earth.set_transform(glm.rotate(t * 1, glm.vec3(0, 0, 1)) * glm.translate(glm.vec3(0, 6.0, 0)))
+        saturn.set_transform((glm.rotate(t * 0.5, glm.vec3(0, 0, 1)) * glm.translate(glm.vec3(0, 8.0, 0))))
+        moon.set_transform((glm.rotate(t * 1.5, glm.vec3(0, 1, 0)) * glm.translate(glm.vec3(3.0, 0, 0))))
+        jupiter.set_transform((glm.rotate(t * 0.8, glm.vec3(0, 0, 1)) * glm.translate(glm.vec3(0, 10.0, 0))))
+        # pipe_jup.set_transform(glm.translate(glm.vec3(0, 0, 1.5)))
+        # pipe2_jup.set_transform(glm.translate(glm.vec3(0, 0, 1)))
+        sun.update_tree_global_transform()
         # rotation
         th = np.radians(t*90)
         R = glm.rotate(th, glm.vec3(0,1,0))
         M = R
 
+        glUseProgram(shader_program_sun)
+        draw_node_sun(sun, VP, loc_MVP_sun, loc_color_sun)
+
+        # 태양의 위치가 light_pos !
+        glUseProgram(shader_program_others)
+
+        sun_pos = glm.vec3(sun.get_global_transform()[3]) 
+        glUniform3f(loc_light_pos_light, sun_pos.x , sun_pos.y, sun_pos.z)
+        glUniform3f(loc_view_pos_light, eye_x, eye_y, eye_z)
+
+        draw_node(earth, VP, loc_MVP_light, loc_M_light, loc_object_color_light)
+        draw_node(saturn, VP, loc_MVP_light, loc_M_light, loc_object_color_light)
+        draw_node(moon, VP, loc_MVP_light, loc_M_light, loc_object_color_light)
+        draw_node(jupiter, VP, loc_MVP_light, loc_M_light, loc_object_color_light)
+        # draw_node(pipe_jup, VP, loc_MVP_light, loc_M_light, loc_object_color_light)
+        # draw_node(pipe2_jup, VP, loc_MVP_light, loc_M_light, loc_object_color_light)
 
         # current frame: P*V*M
-        MVP = g_P*V*M
-        draw_frame(vao_frame, MVP, loc_MVP)
+
+        # glUseProgram(shader_program_frame)
+        # VP = g_P*V
+        # draw_frame(vao_frame, VP, loc_MVP_frame)
+
         # swap front and back buffers
         glfwSwapBuffers(window)
 
