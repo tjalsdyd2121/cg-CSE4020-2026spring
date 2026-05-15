@@ -518,7 +518,7 @@ def main():
     
     sun = Node(None, glm.scale(glm.vec3(0.6)), color_sun, vao_sun, vcnt_sun)
     earth = Node(sun, glm.scale(glm.vec3(0.6)), color_earth, vao_earth,vcnt_earth)
-    moon = Node(earth, glm.scale(glm.vec3(0.3)), color_moon, vao_moon,vcnt_moon)
+    moon = Node(earth, glm.scale(glm.vec3(0.9)), color_moon, vao_moon,vcnt_moon)
     saturn = Node(sun, glm.scale(glm.vec3(0.8)), color_saturn, vao_saturn,vcnt_saturn)
     jupiter = Node(sun, glm.scale(glm.vec3(0.4)), color_jupiter, vao_jupiter,vcnt_jupiter)
     # pipe_jup = Node(jupiter, glm.scale(glm.vec3(0.6)), color_jupiter, vao_pipe, vcnt_pipe)
@@ -570,11 +570,11 @@ def main():
         # animating
         t = glfwGetTime()
         
-        sun.set_transform(glm.rotate(t * 1, glm.vec3(0, 1, 0)) * glm.translate(glm.vec3(12.0, 0, 0)))
-        earth.set_transform(glm.rotate(t * 1, glm.vec3(0, 0, 1)) * glm.translate(glm.vec3(0, 6.0, 0)))
-        saturn.set_transform((glm.rotate(t * 0.5, glm.vec3(0, 0, 1)) * glm.translate(glm.vec3(0, 8.0, 0))))
-        moon.set_transform((glm.rotate(t * 1.5, glm.vec3(0, 1, 0)) * glm.translate(glm.vec3(3.0, 0, 0))))
-        jupiter.set_transform((glm.rotate(t * 0.8, glm.vec3(0, 0, 1)) * glm.translate(glm.vec3(0, 10.0, 0))))
+        sun.set_transform(glm.translate(glm.vec3(0, t, 0)))
+        earth.set_transform(glm.rotate(t * 1, glm.vec3(0, 1, 0)) * glm.translate(glm.vec3(6.0, 0, 0)))
+        saturn.set_transform((glm.rotate(t * 0.5, glm.vec3(0, 1, 0)) * glm.translate(glm.vec3(8.0, 0, 0))))
+        moon.set_transform((glm.rotate(t * 1.5, glm.vec3(1, 0, 0)) * glm.translate(glm.vec3(0, 3.0, 0))))
+        jupiter.set_transform((glm.rotate(t * 0.8, glm.vec3(0, 1, 0)) * glm.translate(glm.vec3(10.0, 0, 0))))
         # pipe_jup.set_transform(glm.translate(glm.vec3(0, 0, 1.5)))
         # pipe2_jup.set_transform(glm.translate(glm.vec3(0, 0, 1)))
         sun.update_tree_global_transform()
