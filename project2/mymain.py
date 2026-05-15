@@ -245,7 +245,7 @@ def button_callback(window, button, action, mod):
             g_mouse_is_dragged = False
 
 def key_callback(window, key, scancode, action, mods):
-    global g_x_is_pressed, g_z_is_pressed
+    global g_x_is_pressed, g_z_is_pressed, g_f_is_pressed
     if key == GLFW_KEY_X:
         if action == GLFW_PRESS or action == GLFW_REPEAT:
             g_x_is_pressed = True
@@ -257,6 +257,11 @@ def key_callback(window, key, scancode, action, mods):
             g_z_is_pressed = True
         elif action == GLFW_RELEASE:
             g_z_is_pressed = False
+    elif key == GLFW_KEY_F:
+        if action == GLFW_PRESS or action == GLFW_REPEAT:
+            g_f_is_pressed = True
+        elif action == GLFW_RELEASE:
+            g_f_is_pressed = False
 
 def cursor_callback(window, xpos, ypos):
     global g_cam_r, g_cam_theta, g_cam_phi, g_cam_center, g_mouse_is_dragged, g_mouse_x_pos, g_mouse_y_pos,g_x_is_pressed, g_z_is_pressed
@@ -456,7 +461,7 @@ def draw_node(node, VP, loc_MVP, loc_M, loc_object_color):
         draw_node(child, VP, loc_MVP, loc_M, loc_object_color)
 
 def main():
-    global g_P, g_cam_r
+    global g_P, g_cam_r, g_cam_center, g_f_is_pressed 
     # initialize glfw
     if not glfwInit():
         return
@@ -509,7 +514,7 @@ def main():
     color_saturn  = glm.vec3(0.9, 0.8, 0.6)
     color_earth   = glm.vec3(0.2, 0.4, 0.8)
     color_moon    = glm.vec3(0.7, 0.7, 0.7)
-    #color_pipe    = glm.vec3(0.0, 1.0, 0.8)
+    color_pipe    = glm.vec3(0.0, 1.0, 0.8)
     
     sun = Node(None, glm.scale(glm.vec3(0.6)), color_sun, vao_sun, vcnt_sun)
     earth = Node(sun, glm.scale(glm.vec3(0.6)), color_earth, vao_earth,vcnt_earth)
@@ -573,6 +578,9 @@ def main():
         # pipe_jup.set_transform(glm.translate(glm.vec3(0, 0, 1.5)))
         # pipe2_jup.set_transform(glm.translate(glm.vec3(0, 0, 1)))
         sun.update_tree_global_transform()
+
+        if g_f_is_pressed:
+            g_cam_center = glm.vec3(sun.get_global_transform()[3])
         # rotation
         th = np.radians(t*90)
         R = glm.rotate(th, glm.vec3(0,1,0))
