@@ -4,6 +4,7 @@ import glm
 import ctypes
 import numpy as np
 import os
+import collections 
 
 # Orbit -> 구면좌표계 사용 
 # eye point 위치와 up vector 표현가능
@@ -460,6 +461,54 @@ def draw_node(node, VP, loc_MVP, loc_M, loc_object_color):
     for child in node.children:
         draw_node(child, VP, loc_MVP, loc_M, loc_object_color)
 
+trails = {}
+num  = 150
+def init_trail(planet, vao_pipe, vcnt_pipe, color_pipe):
+    # 15개의 파이프 노드를 생성하여 행성의 자식으로 등록
+    # shape_transform을 단위행렬(1)로 설정해야 나중에 set_transform이 먹힙니다.
+    pipes = []
+    for pipe in range(num):
+        pipe = Node(parent=planet, shape_transform=glm.mat4(1), color=color_pipe, vao=vao_pipe, vertex_count=vcnt_pipe)
+        pipe.set_transform(glm.scale(glm.vec3(0.00001)))
+        pipes.append(pipe)
+   
+    trails[planet] = {
+        'history': collections.deque(maxlen=num+1),
+        'pipes': pipes
+    }
+
+def update_trail_nodes(planet):
+    data = trails[planet]
+    curr_world_pos = glm.vec3(planet.get_global_transform()[3])
+    data['history'].appendleft(curr_world_pos)
+    
+    hist_len = len(data['history'])
+    inv_m = glm.inverse(planet.get_global_transform())
+    
+    # 🚨 무조건 15개(파이프 전체 개수)만큼 루프를 돕니다.
+    for i in range(num):
+        # 큐에 계산할 과거 위치가 충분히 있는 파이프들
+        if i < hist_len - 1:
+            p1 = glm.vec3(inv_m * glm.vec4(data['history'][i], 1))
+            p2 = glm.vec3(inv_m * glm.vec4(data['history'][i+1], 1))
+            
+            diff = p2 - p1
+            dist = glm.length(diff)
+            
+            if dist > 0.001:
+                T = glm.translate((p1 + p2) * 0.5)
+                R = glm.mat4_cast(glm.quat(glm.vec3(0, 1, 0), diff / dist))
+                thickness = 0.05 * (1.0 - i / num)
+                S = glm.scale(glm.vec3(thickness, dist, thickness))
+                
+                data['pipes'][i].set_transform(T * R * S)
+            else:
+                data['pipes'][i].set_transform(glm.scale(glm.vec3(0)))
+        
+        # 🚨 아직 큐가 덜 차서(초기 프레임) 역할이 없는 꼬리 파이프들은 강제로 숨김
+        else:
+            data['pipes'][i].set_transform(glm.scale(glm.vec3(0)))
+
 def main():
     global g_P, g_cam_r, g_cam_center, g_f_is_pressed 
     # initialize glfw
@@ -523,7 +572,8 @@ def main():
     jupiter = Node(sun, glm.scale(glm.vec3(0.4)), color_jupiter, vao_jupiter,vcnt_jupiter)
     # pipe_jup = Node(jupiter, glm.scale(glm.vec3(0.6)), color_jupiter, vao_pipe, vcnt_pipe)
     # pipe2_jup = Node(pipe_jup, glm.scale(glm.vec3(0.3)), color_jupiter, vao_pipe, vcnt_pipe)
-
+    for p in [earth, saturn, jupiter]:
+        init_trail(p, vao_pipe, vcnt_pipe, color_pipe)
     # initialize projection matrix
     per_height = 10.
     # 1대1 비율로 생성
@@ -570,14 +620,20 @@ def main():
         # animating
         t = glfwGetTime()
         
-        sun.set_transform(glm.translate(glm.vec3(0, t, 0)))
-        earth.set_transform(glm.rotate(t * 1, glm.vec3(0, 1, 0)) * glm.translate(glm.vec3(6.0, 0, 0)))
-        saturn.set_transform((glm.rotate(t * 0.5, glm.vec3(0, 1, 0)) * glm.translate(glm.vec3(8.0, 0, 0))))
+        sun.set_transform(glm.translate(glm.vec3(0, 20*t, 0)))
+        earth.set_transform(glm.rotate(t * 4, glm.vec3(0, 1, 0)) * glm.translate(glm.vec3(6.0, 0, 0)))
+        saturn.set_transform((glm.rotate(t * 2, glm.vec3(0, 1, 0)) * glm.translate(glm.vec3(8.0, 0, 0))))
         moon.set_transform((glm.rotate(t * 1.5, glm.vec3(1, 0, 0)) * glm.translate(glm.vec3(0, 3.0, 0))))
-        jupiter.set_transform((glm.rotate(t * 0.8, glm.vec3(0, 1, 0)) * glm.translate(glm.vec3(10.0, 0, 0))))
+        jupiter.set_transform((glm.rotate(t * 5, glm.vec3(0, 1, 0)) * glm.translate(glm.vec3(10.0, 0, 0))))
         # pipe_jup.set_transform(glm.translate(glm.vec3(0, 0, 1.5)))
         # pipe2_jup.set_transform(glm.translate(glm.vec3(0, 0, 1)))
         sun.update_tree_global_transform()
+
+        
+        for p in [earth, saturn, jupiter]:
+            update_trail_nodes(p)
+        sun.update_tree_global_transform()
+
 
         if g_f_is_pressed:
             g_cam_center = glm.vec3(sun.get_global_transform()[3])
